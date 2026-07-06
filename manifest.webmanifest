@@ -1,0 +1,19 @@
+{
+  "name": "個人健身紀錄",
+  "short_name": "健身紀錄",
+  "description": "本機使用的個人健身紀錄 PWA",
+  "start_url": ".",
+  "display": "standalone",
+  "background_color": "#151515",
+  "theme_color": "#151515",
+  "lang": "zh-Hant",
+  "orientation": "portrait-primary",
+  "icons": [
+    {
+      "src": "icon.svg",
+      "sizes": "192x192",
+      "type": "image/svg+xml",
+      "purpose": "any"
+    }
+  ]
+}

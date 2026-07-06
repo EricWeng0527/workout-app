@@ -1,0 +1,154 @@
+<!doctype html>
+<html lang="zh-Hant">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+    <meta name="theme-color" content="#151515">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="健身紀錄">
+    <title>健身紀錄</title>
+    <link rel="manifest" href="manifest.webmanifest">
+    <link rel="icon" href="icon.svg" type="image/svg+xml">
+    <link rel="apple-touch-icon" href="icon.svg">
+    <link rel="stylesheet" href="styles.css">
+  </head>
+  <body>
+    <div class="app-shell">
+      <header class="topbar">
+        <div>
+          <h1>健身紀錄</h1>
+        </div>
+        <button class="icon-button" type="button" data-action="save-today" aria-label="儲存今天">儲存</button>
+      </header>
+
+      <main>
+        <section class="view is-active" id="view-today" aria-labelledby="today-title">
+          <div class="section-header">
+            <div>
+              <p class="eyebrow">Today</p>
+              <h2 id="today-title">今天</h2>
+            </div>
+            <button class="text-button" type="button" data-action="reset-today">清空</button>
+          </div>
+
+          <form class="date-card" id="today-form">
+            <label>
+              <span>日期</span>
+              <input type="date" id="workout-date">
+            </label>
+            <label>
+              <span>體重</span>
+              <input type="text" inputmode="decimal" id="body-weight" placeholder="例如 64.1">
+            </label>
+          </form>
+
+          <div class="quick-panel">
+            <div class="panel-title">
+              <h3>加入動作</h3>
+            </div>
+            <div class="category-tabs" id="category-tabs" aria-label="動作分類"></div>
+            <div class="chip-list" id="exercise-chips"></div>
+          </div>
+
+          <div class="workout-list" id="today-exercises"></div>
+
+          <div class="empty-state" id="today-empty">
+            <p>選一個常用動作開始紀錄。</p>
+          </div>
+        </section>
+
+        <section class="view" id="view-history" aria-labelledby="history-title">
+          <div class="section-header">
+            <div>
+              <p class="eyebrow">Notes Style</p>
+              <h2 id="history-title">紀錄</h2>
+            </div>
+          </div>
+          <div class="history-list" id="history-list"></div>
+          <div class="empty-state" id="history-empty">
+            <p>還沒有儲存過的訓練。</p>
+          </div>
+        </section>
+
+        <section class="view" id="view-library" aria-labelledby="library-title">
+          <div class="section-header">
+            <div>
+              <p class="eyebrow">Library</p>
+              <h2 id="library-title">動作</h2>
+            </div>
+          </div>
+          <form class="inline-form" id="library-form">
+            <input type="text" id="library-name" placeholder="新增常用動作">
+            <select id="library-category" aria-label="動作分類">
+              <option value="胸">胸</option>
+              <option value="肩">肩</option>
+              <option value="背">背</option>
+              <option value="腿">腿</option>
+              <option value="手臂">手臂</option>
+              <option value="其他">其他</option>
+            </select>
+            <button class="primary-button" type="submit">新增</button>
+          </form>
+          <div class="category-tabs library-tabs" id="library-tabs" aria-label="動作庫分類"></div>
+          <div class="library-list" id="library-list"></div>
+        </section>
+
+        <section class="view" id="view-export" aria-labelledby="export-title">
+          <div class="section-header">
+            <div>
+              <p class="eyebrow">Backup</p>
+              <h2 id="export-title">匯出</h2>
+            </div>
+          </div>
+          <div class="export-actions">
+            <button class="primary-button" type="button" data-action="copy-text">複製文字</button>
+            <button class="secondary-button" type="button" data-action="download-json">下載 JSON</button>
+            <button class="secondary-button" type="button" data-action="import-json">讀取 JSON</button>
+          </div>
+          <input class="file-input" type="file" id="import-file" accept="application/json,.json">
+          <p class="import-status" id="import-status" aria-live="polite"></p>
+          <textarea id="export-output" readonly aria-label="匯出內容"></textarea>
+        </section>
+      </main>
+
+      <nav class="tabbar" aria-label="主要導覽">
+        <button class="tab is-active" type="button" data-view="today">今天</button>
+        <button class="tab" type="button" data-view="history">紀錄</button>
+        <button class="tab" type="button" data-view="library">動作</button>
+        <button class="tab" type="button" data-view="export">匯出</button>
+      </nav>
+    </div>
+
+    <template id="exercise-template">
+      <article class="exercise-card">
+        <div class="exercise-head">
+          <div>
+            <h3></h3>
+            <p class="last-note"></p>
+          </div>
+          <div class="exercise-actions">
+            <button class="mini-button" type="button" data-action="copy-last">上次</button>
+            <button class="mini-button danger" type="button" data-action="remove-exercise">刪除</button>
+          </div>
+        </div>
+        <input class="exercise-note-input" type="text" name="note" placeholder="本次備註，例如坐高、左側、哪一台">
+        <div class="sets"></div>
+        <div class="last-set-buttons"></div>
+        <form class="set-form">
+          <input type="text" name="weight" placeholder="重量">
+          <select name="unit" aria-label="重量單位">
+            <option value="lbs">lbs</option>
+            <option value="kg">kg</option>
+            <option value="">無</option>
+          </select>
+          <input type="number" name="reps" min="1" placeholder="次數">
+          <input type="number" name="repeat" min="1" placeholder="組">
+          <button type="submit" class="primary-button">加</button>
+        </form>
+      </article>
+    </template>
+
+    <script src="app.js"></script>
+  </body>
+</html>
