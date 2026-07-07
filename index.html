@@ -11,7 +11,7 @@
     <link rel="manifest" href="manifest.webmanifest">
     <link rel="icon" href="icon.svg" type="image/svg+xml">
     <link rel="apple-touch-icon" href="icon.svg">
-    <link rel="stylesheet" href="styles.css">
+    <link rel="stylesheet" href="styles.css?v=14">
   </head>
   <body>
     <div class="app-shell">
@@ -119,6 +119,7 @@
         <button class="tab" type="button" data-view="export">匯出</button>
       </nav>
     </div>
+    <div class="toast" id="toast" role="status" aria-live="polite"></div>
 
     <template id="exercise-template">
       <article class="exercise-card">
@@ -128,12 +129,10 @@
             <p class="last-note"></p>
           </div>
           <div class="exercise-actions">
-            <button class="mini-button" type="button" data-action="copy-last">上次</button>
             <button class="mini-button danger" type="button" data-action="remove-exercise">刪除</button>
           </div>
         </div>
         <input class="exercise-note-input" type="text" name="note" placeholder="本次備註，例如坐高、左側、哪一台">
-        <div class="sets"></div>
         <div class="last-set-buttons"></div>
         <form class="set-form">
           <input type="text" name="weight" placeholder="重量">
@@ -144,11 +143,12 @@
           </select>
           <input type="number" name="reps" min="1" placeholder="次數">
           <input type="number" name="repeat" min="1" placeholder="組">
-          <button type="submit" class="primary-button">加</button>
+          <button type="submit" class="primary-button" aria-label="新增組數">+</button>
         </form>
+        <div class="sets"></div>
       </article>
     </template>
 
-    <script src="app.js"></script>
+    <script src="app.js?v=14"></script>
   </body>
 </html>
