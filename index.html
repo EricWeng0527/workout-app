@@ -2,7 +2,7 @@
 <html lang="zh-Hant">
   <head>
     <meta charset="utf-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+    <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
     <meta name="theme-color" content="#151515">
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
@@ -12,7 +12,7 @@
     <link rel="icon" href="icon.svg?v=19" type="image/svg+xml">
     <link rel="icon" href="icon-192.png" type="image/png" sizes="192x192">
     <link rel="apple-touch-icon" sizes="180x180" href="icon-180.png">
-    <link rel="stylesheet" href="styles.css?v=14">
+    <link rel="stylesheet" href="styles.css?v=28">
   </head>
   <body>
     <div class="app-shell">
@@ -20,7 +20,7 @@
         <div>
           <h1>健身紀錄</h1>
         </div>
-        <button class="icon-button" type="button" data-action="save-today" aria-label="儲存今天">儲存</button>
+        <button class="icon-button" id="save-today-button" type="button" data-action="save-today" aria-label="儲存今天">儲存</button>
       </header>
 
       <main>
@@ -30,7 +30,6 @@
               <p class="eyebrow">Today</p>
               <h2 id="today-title">今天</h2>
             </div>
-            <button class="text-button" type="button" data-action="reset-today">清空</button>
           </div>
 
           <form class="date-card" id="today-form">
@@ -62,9 +61,10 @@
         <section class="view" id="view-history" aria-labelledby="history-title">
           <div class="section-header">
             <div>
-              <p class="eyebrow">Notes Style</p>
+              <p class="eyebrow">History</p>
               <h2 id="history-title">紀錄</h2>
             </div>
+            <button class="text-button history-edit-button" id="history-edit-button" type="button" data-action="toggle-history-edit" aria-pressed="false">編輯</button>
           </div>
           <div class="history-list" id="history-list"></div>
           <div class="empty-state" id="history-empty">
@@ -79,19 +79,11 @@
               <h2 id="library-title">動作</h2>
             </div>
           </div>
+          <div class="category-tabs library-tabs" id="library-tabs" aria-label="動作庫分類"></div>
           <form class="inline-form" id="library-form">
-            <input type="text" id="library-name" placeholder="新增常用動作">
-            <select id="library-category" aria-label="動作分類">
-              <option value="胸">胸</option>
-              <option value="肩">肩</option>
-              <option value="背">背</option>
-              <option value="腿">腿</option>
-              <option value="手臂">手臂</option>
-              <option value="其他">其他</option>
-            </select>
+            <input type="text" id="library-name" placeholder="新增動作">
             <button class="primary-button" type="submit">新增</button>
           </form>
-          <div class="category-tabs library-tabs" id="library-tabs" aria-label="動作庫分類"></div>
           <div class="library-list" id="library-list"></div>
         </section>
 
@@ -120,36 +112,54 @@
         <button class="tab" type="button" data-view="export">匯出</button>
       </nav>
     </div>
+    <div class="confirm-backdrop" id="confirm-backdrop" hidden>
+      <section class="confirm-dialog" role="dialog" aria-modal="true" aria-labelledby="confirm-title" aria-describedby="confirm-message">
+        <p class="confirm-label">DELETE</p>
+        <h2 id="confirm-title">確認刪除</h2>
+        <p class="confirm-message" id="confirm-message"></p>
+        <div class="confirm-actions">
+          <button class="secondary-button" type="button" id="confirm-cancel">取消</button>
+          <button class="confirm-delete-button" type="button" id="confirm-accept">確認刪除</button>
+        </div>
+      </section>
+    </div>
+    <div class="toast-backdrop" id="toast-backdrop" aria-hidden="true"></div>
     <div class="toast" id="toast" role="status" aria-live="polite"></div>
 
     <template id="exercise-template">
       <article class="exercise-card">
         <div class="exercise-head">
-          <div>
-            <h3></h3>
-            <p class="last-note"></p>
-          </div>
+          <button class="exercise-toggle" type="button" data-action="toggle-exercise" aria-expanded="false">
+            <span class="exercise-summary">
+              <span class="exercise-title"></span>
+              <span class="last-note"></span>
+            </span>
+            <span class="exercise-chevron" aria-hidden="true">⌄</span>
+          </button>
           <div class="exercise-actions">
             <button class="mini-button danger" type="button" data-action="remove-exercise">刪除</button>
           </div>
         </div>
-        <input class="exercise-note-input" type="text" name="note" placeholder="本次備註，例如坐高、左側、哪一台">
-        <div class="last-set-buttons"></div>
-        <form class="set-form">
-          <input type="text" name="weight" placeholder="重量">
-          <select name="unit" aria-label="重量單位">
-            <option value="lbs">lbs</option>
-            <option value="kg">kg</option>
-            <option value="">無</option>
-          </select>
-          <input type="number" name="reps" min="1" placeholder="次數">
-          <input type="number" name="repeat" min="1" placeholder="組">
-          <button type="submit" class="primary-button" aria-label="新增組數">+</button>
-        </form>
+        <div class="exercise-workspace" hidden>
+          <input class="exercise-note-input" type="text" name="note" placeholder="本次備註，例如坐高、左側、哪一台">
+          <div class="last-set-buttons"></div>
+          <form class="set-form">
+            <input type="text" name="weight" placeholder="重量">
+            <select name="unit" aria-label="重量單位">
+              <option value="lbs">lbs</option>
+              <option value="kg">kg</option>
+              <option value="">無</option>
+            </select>
+            <input type="number" name="reps" min="1" placeholder="次數">
+            <input type="number" name="repeat" min="1" placeholder="組">
+            <button type="submit" class="primary-button" aria-label="新增組數">+</button>
+          </form>
+          <button class="repeat-set-button secondary-button" type="button" data-action="repeat-last-set" disabled>再一組</button>
+        </div>
         <div class="sets"></div>
       </article>
     </template>
 
-    <script src="app.js?v=14"></script>
+    <script src="app.js?v=28"></script>
   </body>
 </html>

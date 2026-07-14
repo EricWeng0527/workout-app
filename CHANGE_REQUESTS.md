@@ -67,3 +67,56 @@ Modify one item at a time. After each item, verify that change before moving to 
 8. Success toasts
 9. Color distinction for new set rows vs quick-fill shortcuts
 10. Library ordering
+
+## Confirmed follow-up requests (2026-07-14)
+
+These requests were reviewed and confirmed before implementation. Modify one item at a time and verify it before moving to the next item.
+
+Implementation status: completed and verified on a 360px mobile viewport.
+
+1. Remove the Today "清空" button.
+   - Remove the reset action entirely to prevent accidental taps.
+   - Verification: Today no longer displays a "清空" button or exposes its click action.
+
+2. Confirm every destructive delete action.
+   - Require confirmation before deleting a set, an exercise from Today, a saved workout, or a Library exercise.
+   - Cancelling the confirmation must leave data unchanged.
+   - Verification: test both confirm and cancel paths for every delete action.
+
+3. Show only one exercise input workspace at a time.
+   - Exercise cards are collapsed by default and show their name and completed sets.
+   - Tapping a card opens its note, quick-fill shortcuts, set inputs, and controls while closing the previously open card.
+   - A newly added exercise opens automatically.
+   - Verification: switching between at least two exercises leaves exactly one input workspace visible.
+
+4. Include the personalized exercise Library in JSON backup and restore.
+   - Export exercise names, categories, and category-specific order.
+   - Import and restore the complete personalized Library and its order.
+   - Keep the fixed category list unchanged.
+   - Verification: reorder and add exercises, export JSON, clear test storage, import it, and confirm names, categories, and order are restored.
+
+5. Prevent page zoom during app use.
+   - Disable pinch/double-tap viewport scaling.
+   - Keep form controls at a font size that does not trigger iPhone focus zoom.
+   - Verification: inspect viewport settings and verify all editable controls use at least 16px text on mobile.
+
+6. Show weekdays in saved workout history.
+   - Display the weekday beside dates in History.
+   - Do not add the weekday to the Today date picker.
+   - Verification: compare known dates against their displayed Traditional Chinese weekday.
+
+7. Strengthen create/delete success feedback.
+   - Center the temporary message in the viewport.
+   - Add a translucent black full-screen backdrop while it is visible.
+   - Keep success messages light green and delete messages light red.
+   - Hide the message and backdrop automatically after about one second.
+   - Verification: trigger create and delete success states and confirm placement, colors, backdrop, and automatic dismissal.
+
+8. Add a "再一組" action for the active exercise.
+   - Repeat the previous set's weight, unit, and reps in one tap.
+   - Use the existing identical-set merge behavior to increment the repeat count.
+   - Disable the action when the exercise has no previous set.
+   - Verification: add one set, tap "再一組", and confirm `20kg x10` becomes `20kg x10 x2`.
+
+9. Continue sequential implementation and verification.
+   - Complete and verify each item before starting the next one.

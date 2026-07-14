@@ -25,6 +25,7 @@ const starterExercises = [
 const state = loadState();
 
 const elements = {
+  saveToday: document.querySelector("#save-today-button"),
   date: document.querySelector("#workout-date"),
   bodyWeight: document.querySelector("#body-weight"),
   categoryTabs: document.querySelector("#category-tabs"),
@@ -33,23 +34,33 @@ const elements = {
   todayEmpty: document.querySelector("#today-empty"),
   historyList: document.querySelector("#history-list"),
   historyEmpty: document.querySelector("#history-empty"),
+  historyEdit: document.querySelector("#history-edit-button"),
   libraryList: document.querySelector("#library-list"),
   libraryTabs: document.querySelector("#library-tabs"),
   libraryForm: document.querySelector("#library-form"),
   libraryName: document.querySelector("#library-name"),
-  libraryCategory: document.querySelector("#library-category"),
   exportOutput: document.querySelector("#export-output"),
   importFile: document.querySelector("#import-file"),
   importStatus: document.querySelector("#import-status"),
   exerciseTemplate: document.querySelector("#exercise-template"),
+  confirmBackdrop: document.querySelector("#confirm-backdrop"),
+  confirmMessage: document.querySelector("#confirm-message"),
+  confirmCancel: document.querySelector("#confirm-cancel"),
+  confirmAccept: document.querySelector("#confirm-accept"),
+  toastBackdrop: document.querySelector("#toast-backdrop"),
   toast: document.querySelector("#toast"),
 };
 
 let draft = createEmptyWorkout(todayISO());
 let activeCategory = CATEGORIES[0];
 let activeLibraryCategory = CATEGORIES[0];
+let activeExerciseId = null;
+let isHistoryEditing = false;
 let editingLibraryName = "";
 let toastTimer = 0;
+let confirmResolver = null;
+let confirmHideTimer = 0;
+let confirmRestoreFocus = null;
 let libraryDrag = null;
 
 init();
@@ -70,6 +81,14 @@ function init() {
   });
   elements.libraryForm.addEventListener("submit", handleAddLibraryExercise);
   elements.importFile.addEventListener("change", handleImportJson);
+  elements.confirmCancel.addEventListener("click", () => finishDeleteConfirmation(false));
+  elements.confirmAccept.addEventListener("click", () => finishDeleteConfirmation(true));
+  elements.confirmBackdrop.addEventListener("click", (event) => {
+    if (event.target === elements.confirmBackdrop) finishDeleteConfirmation(false);
+  });
+  document.addEventListener("keydown", (event) => {
+    if (event.key === "Escape" && confirmResolver) finishDeleteConfirmation(false);
+  });
   elements.libraryList.addEventListener("pointerdown", handleLibraryDragStart);
   document.addEventListener("pointermove", handleLibraryDragMove);
   document.addEventListener("pointerup", handleLibraryDragEnd);
@@ -148,13 +167,10 @@ function mergeExercises(exercises) {
 }
 
 function normalizeLibrary(library) {
-  const source = Array.isArray(library) && library.length ? library : starterExercises;
+  const source = Array.isArray(library) ? library : starterExercises;
 
-  const byName = new Map(starterExercises.map((exercise, index) => {
-    const normalizedExercise = normalizeExerciseIdentity(exercise.name);
-    return [normalizedExercise.name, { name: normalizedExercise.name, category: exercise.category, order: index }];
-  }));
-  source.forEach((item) => {
+  const byName = new Map();
+  source.forEach((item, sourceIndex) => {
     const rawExercise = typeof item === "string" ? { name: item, category: guessCategory(item) } : item;
     if (!rawExercise?.name) return;
     const exercise = normalizeExerciseIdentity(rawExercise.name);
@@ -163,7 +179,7 @@ function normalizeLibrary(library) {
     byName.set(exercise.name, {
       name: exercise.name,
       category,
-      order: Number.isFinite(order) ? order : byName.get(exercise.name)?.order,
+      order: Number.isFinite(order) ? order : (byName.get(exercise.name)?.order ?? sourceIndex),
     });
   });
 
@@ -269,6 +285,12 @@ function formatDate(dateString) {
   return `${date.getMonth() + 1}/${date.getDate()}`;
 }
 
+function formatWeekday(dateString) {
+  const date = new Date(`${dateString}T00:00:00`);
+  const weekdays = ["星期日", "星期一", "星期二", "星期三", "星期四", "星期五", "星期六"];
+  return weekdays[date.getDay()];
+}
+
 function handleClick(event) {
   const button = event.target.closest("button");
   if (!button) return;
@@ -288,11 +310,16 @@ function handleClick(event) {
 
   const actions = {
     "save-today": saveToday,
-    "reset-today": resetToday,
+    "toggle-history-edit": () => {
+      isHistoryEditing = !isHistoryEditing;
+      renderHistory();
+    },
     "copy-text": copyTextExport,
     "download-json": downloadJson,
     "import-json": () => elements.importFile.click(),
     "fill-last-set": () => fillLastSet(exerciseId, Number(button.dataset.index || 0)),
+    "repeat-last-set": () => repeatLastSet(exerciseId),
+    "toggle-exercise": () => toggleExerciseWorkspace(exerciseId),
     "select-category": () => {
       activeCategory = button.dataset.category;
       renderToday();
@@ -327,6 +354,7 @@ function handleDateChange() {
   const buffered = loadDraftBuffer(date);
   const existing = state.workouts.find((workout) => workout.date === date);
   draft = buffered || (existing ? cloneWorkout(existing) : createEmptyWorkout(date));
+  activeExerciseId = null;
   elements.bodyWeight.value = draft.bodyWeight || "";
   renderToday();
 }
@@ -335,7 +363,7 @@ function handleAddLibraryExercise(event) {
   event.preventDefault();
   const name = elements.libraryName.value.trim();
   if (!name) return;
-  addToLibrary(name, elements.libraryCategory.value);
+  addToLibrary(name, activeLibraryCategory);
   elements.libraryName.value = "";
   renderAll();
   showToast("新增成功", "success");
@@ -358,7 +386,8 @@ function addToLibrary(name, category = activeCategory) {
   persist();
 }
 
-function deleteLibraryExercise(name) {
+async function deleteLibraryExercise(name) {
+  if (!(await confirmDeletion(`確定要刪除動作「${name}」嗎？`))) return;
   state.exerciseLibrary = state.exerciseLibrary.filter((exercise) => exercise.name !== name);
   persist();
   renderAll();
@@ -436,7 +465,8 @@ function rebuildLibraryFromWorkouts() {
   state.exerciseLibrary = normalizeLibraryOrders([...byName.values()]);
 }
 
-function deleteWorkout(date) {
+async function deleteWorkout(date) {
+  if (!(await confirmDeletion(`確定要刪除 ${formatDate(date)} 的訓練紀錄嗎？`))) return;
   state.workouts = state.workouts.filter((workout) => workout.date !== date);
   if (draft.date === date) {
     draft = createEmptyWorkout(date);
@@ -453,17 +483,20 @@ function addExercise(name) {
   const existing = draft.exercises.find((exercise) => exercise.name === name);
   if (existing) {
     draft.exercises = [existing, ...draft.exercises.filter((exercise) => exercise.id !== existing.id)];
+    activeExerciseId = existing.id;
     persistDraftBuffer();
     renderToday();
     return;
   }
 
-  draft.exercises.unshift({
+  const exercise = {
     id: newId(),
     name,
     note: "",
     sets: [],
-  });
+  };
+  draft.exercises.unshift(exercise);
+  activeExerciseId = exercise.id;
 
   addToLibrary(name, getExerciseCategory(name));
   persistDraftBuffer();
@@ -471,11 +504,19 @@ function addExercise(name) {
   showToast("新增成功", "success");
 }
 
-function removeExercise(exerciseId) {
+async function removeExercise(exerciseId) {
+  const exercise = draft.exercises.find((item) => item.id === exerciseId);
+  if (!exercise || !(await confirmDeletion(`確定要刪除本次的「${exercise.name}」嗎？`))) return;
   draft.exercises = draft.exercises.filter((exercise) => exercise.id !== exerciseId);
+  if (activeExerciseId === exerciseId) activeExerciseId = null;
   persistDraftBuffer();
   renderToday();
   showToast("刪除成功", "danger");
+}
+
+function toggleExerciseWorkspace(exerciseId) {
+  activeExerciseId = activeExerciseId === exerciseId ? null : exerciseId;
+  renderToday();
 }
 
 function fillLastSet(exerciseId, index) {
@@ -495,9 +536,29 @@ function fillLastSet(exerciseId, index) {
   card.querySelector("[name='weight']").focus();
 }
 
-function removeSet(exerciseId, setId) {
+function repeatLastSet(exerciseId) {
+  const exercise = draft.exercises.find((item) => item.id === exerciseId);
+  const previousSet = exercise?.sets[exercise.sets.length - 1];
+  if (!exercise || !previousSet) return;
+
+  const parsed = normalizeSet(previousSet);
+  addSetToExercise(exercise, {
+    id: newId(),
+    weight: parsed.weight,
+    unit: parsed.unit,
+    reps: parsed.reps,
+    repeat: "1",
+  });
+  persistDraftBuffer();
+  renderToday();
+  showToast("新增成功", "success");
+}
+
+async function removeSet(exerciseId, setId) {
   const exercise = draft.exercises.find((item) => item.id === exerciseId);
   if (!exercise) return;
+  const set = exercise.sets.find((item) => item.id === setId);
+  if (!set || !(await confirmDeletion(`確定要刪除 ${formatSet(set)} 嗎？`))) return;
   exercise.sets = exercise.sets.filter((set) => set.id !== setId);
   persistDraftBuffer();
   renderToday();
@@ -530,13 +591,6 @@ function saveToday() {
   switchView("history");
 }
 
-function resetToday() {
-  draft = createEmptyWorkout(elements.date.value || todayISO());
-  elements.bodyWeight.value = "";
-  clearDraftBuffer(draft.date);
-  renderToday();
-}
-
 function sortWorkouts() {
   state.workouts.sort((a, b) => b.date.localeCompare(a.date));
 }
@@ -550,6 +604,12 @@ function findLastExercise(name) {
 }
 
 function switchView(view) {
+  if (view !== "history" && isHistoryEditing) {
+    isHistoryEditing = false;
+    renderHistory();
+  }
+  elements.saveToday.hidden = view !== "today";
+
   document.querySelectorAll(".view").forEach((section) => {
     section.classList.toggle("is-active", section.id === `view-${view}`);
   });
@@ -568,6 +628,7 @@ function renderAll() {
 }
 
 function renderToday() {
+  if (!draft.exercises.some((exercise) => exercise.id === activeExerciseId)) activeExerciseId = null;
   elements.categoryTabs.innerHTML = "";
   CATEGORIES.forEach((category) => {
     const tab = document.createElement("button");
@@ -602,7 +663,12 @@ function renderToday() {
 function renderExerciseCard(exercise) {
   const node = elements.exerciseTemplate.content.firstElementChild.cloneNode(true);
   node.dataset.exerciseId = exercise.id;
-  node.querySelector("h3").textContent = exercise.name;
+  const isActive = exercise.id === activeExerciseId;
+  node.classList.toggle("is-active", isActive);
+  node.querySelector(".exercise-title").textContent = exercise.name;
+  const toggle = node.querySelector(".exercise-toggle");
+  toggle.setAttribute("aria-expanded", String(isActive));
+  node.querySelector(".exercise-workspace").hidden = !isActive;
   node.querySelector("[name='unit']").value = findPreferredUnit(exercise);
   const noteInput = node.querySelector("[name='note']");
   noteInput.value = exercise.note || "";
@@ -639,6 +705,7 @@ function renderExerciseCard(exercise) {
     `;
     sets.append(row);
   });
+  node.querySelector(".repeat-set-button").disabled = exercise.sets.length === 0;
 
   node.querySelector(".set-form").addEventListener("submit", (event) => {
     event.preventDefault();
@@ -655,14 +722,7 @@ function renderExerciseCard(exercise) {
       repeat: data.get("repeat")?.toString().trim() || "1",
     };
 
-    const lastSet = exercise.sets[exercise.sets.length - 1];
-    if (lastSet && isSameSet(lastSet, nextSet)) {
-      const currentRepeat = Number(lastSet.repeat || 1) || 1;
-      const addedRepeat = Number(nextSet.repeat || 1) || 1;
-      lastSet.repeat = String(currentRepeat + addedRepeat);
-    } else {
-      exercise.sets.push(nextSet);
-    }
+    addSetToExercise(exercise, nextSet);
 
     form.reset();
     persistDraftBuffer();
@@ -673,7 +733,23 @@ function renderExerciseCard(exercise) {
   return node;
 }
 
+function addSetToExercise(exercise, nextSet) {
+  const previousSet = exercise.sets[exercise.sets.length - 1];
+  if (!previousSet || !isSameSet(previousSet, nextSet)) {
+    exercise.sets.push(nextSet);
+    return;
+  }
+
+  const currentRepeat = Number(previousSet.repeat || 1) || 1;
+  const addedRepeat = Number(nextSet.repeat || 1) || 1;
+  previousSet.repeat = String(currentRepeat + addedRepeat);
+}
+
 function renderHistory() {
+  if (!state.workouts.length) isHistoryEditing = false;
+  elements.historyEdit.textContent = isHistoryEditing ? "完成" : "編輯";
+  elements.historyEdit.disabled = state.workouts.length === 0;
+  elements.historyEdit.setAttribute("aria-pressed", String(isHistoryEditing));
   elements.historyList.innerHTML = "";
   state.workouts.forEach((workout) => {
     const item = document.createElement("article");
@@ -686,19 +762,25 @@ function renderHistory() {
     const date = document.createElement("span");
     date.className = "history-date";
     date.textContent = formatDate(workout.date);
+    const weekday = document.createElement("span");
+    weekday.className = "history-weekday";
+    weekday.textContent = formatWeekday(workout.date);
+    date.append(weekday);
     const weight = document.createElement("span");
     weight.className = "history-weight";
     weight.textContent = workout.bodyWeight ? `${workout.bodyWeight} kg` : "未記錄體重";
     summary.append(date, weight);
 
-    const deleteButton = document.createElement("button");
-    deleteButton.className = "mini-button danger";
-    deleteButton.type = "button";
-    deleteButton.dataset.action = "delete-workout";
-    deleteButton.dataset.date = workout.date;
-    deleteButton.textContent = "刪除";
-
-    head.append(summary, deleteButton);
+    head.append(summary);
+    if (isHistoryEditing) {
+      const deleteButton = document.createElement("button");
+      deleteButton.className = "mini-button danger";
+      deleteButton.type = "button";
+      deleteButton.dataset.action = "delete-workout";
+      deleteButton.dataset.date = workout.date;
+      deleteButton.textContent = "刪除";
+      head.append(deleteButton);
+    }
 
     const exercises = document.createElement("div");
     exercises.className = "history-exercises";
@@ -736,6 +818,8 @@ function renderHistory() {
 }
 
 function renderLibrary() {
+  elements.libraryName.placeholder = `新增「${activeLibraryCategory}」動作`;
+  elements.libraryName.setAttribute("aria-label", `新增${activeLibraryCategory}類動作`);
   elements.libraryTabs.innerHTML = "";
   CATEGORIES.forEach((category) => {
     const tab = document.createElement("button");
@@ -809,10 +893,6 @@ function renderLibrary() {
     label.className = "library-name";
     label.textContent = exercise.name;
 
-    const category = document.createElement("span");
-    category.className = "library-category";
-    category.textContent = exercise.category;
-
     const editButton = document.createElement("button");
     editButton.className = "mini-button";
     editButton.type = "button";
@@ -827,7 +907,7 @@ function renderLibrary() {
     deleteButton.dataset.name = exercise.name;
     deleteButton.textContent = "刪除";
 
-    item.append(dragHandle, label, category, editButton, deleteButton);
+    item.append(dragHandle, label, editButton, deleteButton);
     elements.libraryList.append(item);
   });
 }
@@ -908,6 +988,7 @@ async function handleImportJson(event) {
 
     const existingToday = state.workouts.find((workout) => workout.date === elements.date.value);
     draft = existingToday ? cloneWorkout(existingToday) : createEmptyWorkout(elements.date.value || todayISO());
+    activeExerciseId = null;
     elements.bodyWeight.value = draft.bodyWeight || "";
 
     renderAll();
@@ -982,10 +1063,43 @@ function showToast(message, type = "success") {
   elements.toast.classList.remove("is-success", "is-danger");
   elements.toast.classList.add(type === "danger" ? "is-danger" : "is-success");
   elements.toast.classList.add("is-visible");
+  elements.toastBackdrop?.classList.add("is-visible");
   clearTimeout(toastTimer);
   toastTimer = window.setTimeout(() => {
     elements.toast.classList.remove("is-visible");
-  }, 1600);
+    elements.toastBackdrop?.classList.remove("is-visible");
+  }, 600);
+}
+
+function confirmDeletion(message) {
+  if (confirmResolver) finishDeleteConfirmation(false);
+
+  clearTimeout(confirmHideTimer);
+  confirmRestoreFocus = document.activeElement;
+  elements.confirmMessage.textContent = message;
+  elements.confirmBackdrop.hidden = false;
+
+  return new Promise((resolve) => {
+    confirmResolver = resolve;
+    requestAnimationFrame(() => {
+      elements.confirmBackdrop.classList.add("is-visible");
+      elements.confirmCancel.focus();
+    });
+  });
+}
+
+function finishDeleteConfirmation(confirmed) {
+  if (!confirmResolver) return;
+
+  const resolve = confirmResolver;
+  confirmResolver = null;
+  elements.confirmBackdrop.classList.remove("is-visible");
+  confirmRestoreFocus?.focus();
+  confirmRestoreFocus = null;
+  confirmHideTimer = window.setTimeout(() => {
+    elements.confirmBackdrop.hidden = true;
+  }, 160);
+  resolve(confirmed);
 }
 
 function formatWorkout(workout) {
@@ -1040,13 +1154,26 @@ async function copyTextExport() {
 }
 
 function downloadJson() {
-  const blob = new Blob([JSON.stringify(state, null, 2)], { type: "application/json" });
+  const blob = new Blob([JSON.stringify(createBackupPayload(), null, 2)], { type: "application/json" });
   const url = URL.createObjectURL(blob);
   const link = document.createElement("a");
   link.href = url;
   link.download = `workout-backup-${todayISO()}.json`;
   link.click();
   URL.revokeObjectURL(url);
+}
+
+function createBackupPayload() {
+  return {
+    version: 2,
+    exportedAt: new Date().toISOString(),
+    workouts: cloneWorkout(state.workouts),
+    exerciseLibrary: state.exerciseLibrary.map((exercise) => ({
+      name: exercise.name,
+      category: exercise.category,
+      order: exercise.order,
+    })),
+  };
 }
 
 function normalizeSet(set) {

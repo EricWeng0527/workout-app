@@ -39,6 +39,7 @@ body {
   color: var(--ink-on-dark);
   font-family: var(--font-ui);
   letter-spacing: 0;
+  touch-action: manipulation;
 }
 
 body::before {
@@ -203,6 +204,7 @@ textarea {
   background: var(--panel-strong);
   color: var(--ink);
   outline: 0;
+  font-size: 16px;
 }
 
 input {
@@ -221,7 +223,7 @@ input {
 #workout-date {
   -webkit-appearance: none;
   appearance: none;
-  font-size: 14px;
+  font-size: 16px;
 }
 
 input[type="date"],
@@ -267,8 +269,14 @@ textarea:focus {
   gap: 8px;
 }
 
+.repeat-set-button {
+  width: 100%;
+  margin-top: 8px;
+}
+
 .inline-form {
-  grid-template-columns: minmax(0, 1fr) 82px auto;
+  grid-template-columns: minmax(0, 1fr) auto;
+  margin-top: 10px;
   margin-bottom: 12px;
 }
 
@@ -365,6 +373,51 @@ textarea:focus {
   padding-bottom: 10px;
 }
 
+.exercise-toggle {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 24px;
+  align-items: center;
+  min-width: 0;
+  flex: 1;
+  padding: 0;
+  background: transparent;
+  color: var(--ink);
+  text-align: left;
+}
+
+.exercise-summary {
+  display: grid;
+  min-width: 0;
+}
+
+.exercise-title {
+  font-size: 17px;
+  font-weight: 900;
+  line-height: 1.25;
+  overflow-wrap: anywhere;
+}
+
+.exercise-chevron {
+  font-family: var(--font-number);
+  font-size: 22px;
+  font-weight: 900;
+  line-height: 1;
+  text-align: center;
+  transition: transform 160ms ease;
+}
+
+.exercise-card.is-active .exercise-chevron {
+  transform: rotate(180deg);
+}
+
+.exercise-workspace {
+  padding-top: 10px;
+}
+
+.exercise-workspace[hidden] {
+  display: none;
+}
+
 .last-note {
   color: var(--muted);
   font-size: 12px;
@@ -374,10 +427,9 @@ textarea:focus {
 
 .exercise-note-input {
   min-height: 38px;
-  margin-top: 10px;
   background: #ebe4d7;
   border-color: #c8beaa;
-  font-size: 13px;
+  font-size: 14px;
 }
 
 .exercise-actions {
@@ -396,7 +448,7 @@ textarea:focus {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 8px;
-  margin-bottom: 12px;
+  margin: 10px 0 12px;
 }
 
 .set-row {
@@ -460,6 +512,10 @@ textarea:focus {
 
 .section-header .text-button {
   color: var(--accent-2);
+}
+
+.history-edit-button[aria-pressed="true"] {
+  color: var(--accent);
 }
 
 .panel-title .text-button {
@@ -529,9 +585,18 @@ textarea:focus {
 }
 
 .history-date {
-  display: block;
+  display: flex;
+  align-items: baseline;
+  gap: 7px;
   font-size: 22px;
   font-weight: 900;
+}
+
+.history-weekday {
+  color: var(--muted);
+  font-family: var(--font-ui);
+  font-size: 13px;
+  font-weight: 800;
 }
 
 .history-weight {
@@ -586,7 +651,7 @@ textarea:focus {
 
 .library-item {
   display: grid;
-  grid-template-columns: 34px minmax(0, 1fr) auto auto auto;
+  grid-template-columns: 34px minmax(0, 1fr) auto auto;
   align-items: center;
   gap: 8px;
 }
@@ -619,17 +684,6 @@ textarea:focus {
 .library-name {
   font-weight: 900;
   overflow-wrap: anywhere;
-}
-
-.library-category {
-  min-width: 42px;
-  border-radius: 6px;
-  background: #202020;
-  color: var(--accent);
-  font-size: 12px;
-  font-weight: 900;
-  padding: 7px 9px;
-  text-align: center;
 }
 
 .export-actions {
@@ -698,15 +752,107 @@ textarea {
   box-shadow: inset 0 -4px 0 var(--accent);
 }
 
+.confirm-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 20;
+  display: grid;
+  place-items: center;
+  padding: 20px;
+  background: rgba(0, 0, 0, 0.68);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 160ms ease;
+}
+
+.confirm-backdrop[hidden] {
+  display: none;
+}
+
+.confirm-backdrop.is-visible {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+.confirm-dialog {
+  width: min(330px, 100%);
+  padding: 18px;
+  border: 1px solid var(--line-paper);
+  border-top: 5px solid var(--accent);
+  border-radius: var(--radius);
+  background: var(--panel-strong);
+  color: var(--ink);
+  box-shadow: 0 22px 54px rgba(0, 0, 0, 0.46);
+  transform: translateY(8px) scale(0.98);
+  transition: transform 160ms ease;
+}
+
+.confirm-backdrop.is-visible .confirm-dialog {
+  transform: translateY(0) scale(1);
+}
+
+.confirm-label {
+  color: var(--danger);
+  font-family: var(--font-number);
+  font-size: 11px;
+  font-weight: 900;
+}
+
+.confirm-dialog h2 {
+  margin-top: 3px;
+  color: var(--ink);
+  font-size: 21px;
+}
+
+.confirm-message {
+  margin-top: 10px;
+  color: var(--muted);
+  font-size: 14px;
+  font-weight: 800;
+  line-height: 1.5;
+  overflow-wrap: anywhere;
+}
+
+.confirm-actions {
+  display: grid;
+  grid-template-columns: 1fr 1.25fr;
+  gap: 8px;
+  margin-top: 18px;
+}
+
+.confirm-delete-button {
+  min-height: 42px;
+  border-radius: 6px;
+  background: var(--danger);
+  color: #ffffff;
+  font-weight: 900;
+  box-shadow: inset 0 -3px 0 rgba(0, 0, 0, 0.2);
+}
+
+.toast-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 9;
+  background: rgba(0, 0, 0, 0.48);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 160ms ease;
+}
+
+.toast-backdrop.is-visible {
+  opacity: 1;
+  pointer-events: auto;
+}
+
 .toast {
   position: fixed;
-  right: 18px;
-  top: calc(12px + env(safe-area-inset-top));
-  left: 18px;
+  top: 50%;
+  left: 50%;
   z-index: 10;
   display: grid;
   place-items: center;
   min-height: 44px;
+  width: min(280px, calc(100vw - 48px));
   padding: 10px 14px;
   border: 1px solid rgba(246, 196, 0, 0.8);
   border-radius: 6px;
@@ -718,7 +864,7 @@ textarea {
   box-shadow: 0 14px 32px rgba(0, 0, 0, 0.35);
   opacity: 0;
   pointer-events: none;
-  transform: translateY(-10px);
+  transform: translate(-50%, calc(-50% + 8px)) scale(0.98);
   transition: opacity 160ms ease, transform 160ms ease;
 }
 
@@ -736,7 +882,7 @@ textarea {
 
 .toast.is-visible {
   opacity: 1;
-  transform: translateY(0);
+  transform: translate(-50%, -50%) scale(1);
 }
 
 @keyframes view-rise {
@@ -807,14 +953,6 @@ textarea {
     grid-template-columns: minmax(0, 1.34fr) minmax(0, 0.78fr);
   }
 
-  .inline-form {
-    grid-template-columns: 1fr 82px;
-  }
-
-  .inline-form .primary-button {
-    grid-column: span 2;
-  }
-
   .set-form {
     grid-template-columns: minmax(0, 1fr) 72px minmax(58px, 0.72fr);
   }
@@ -853,15 +991,11 @@ textarea {
   }
 
   .library-item {
-    grid-template-columns: 34px minmax(0, 1fr) auto;
+    grid-template-columns: 34px minmax(0, 1fr) auto auto;
   }
 
   .library-item.is-editing {
     grid-template-columns: minmax(0, 1fr) 82px;
-  }
-
-  .library-category {
-    justify-self: start;
   }
 
   .library-item .mini-button {
