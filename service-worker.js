@@ -1,9 +1,9 @@
-const CACHE_NAME = "workout-pwa-v28";
+const CACHE_NAME = "workout-pwa-v31";
 const ASSETS = [
   "./",
   "index.html",
-  "styles.css?v=28",
-  "app.js?v=28",
+  "styles.css?v=31",
+  "app.js?v=31",
   "manifest.webmanifest",
   "icon.svg?v=19",
   "icon-180.png",

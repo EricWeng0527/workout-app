@@ -518,6 +518,10 @@ textarea:focus {
   color: var(--accent);
 }
 
+.library-edit-button[aria-pressed="true"] {
+  color: var(--accent);
+}
+
 .panel-title .text-button {
   min-height: 34px;
   padding: 0 12px;
@@ -651,9 +655,13 @@ textarea:focus {
 
 .library-item {
   display: grid;
-  grid-template-columns: 34px minmax(0, 1fr) auto auto;
+  grid-template-columns: minmax(0, 1fr);
   align-items: center;
   gap: 8px;
+}
+
+.library-item.is-library-editing {
+  grid-template-columns: 34px minmax(0, 1fr) auto auto;
 }
 
 .library-item.is-editing {
@@ -991,6 +999,10 @@ textarea {
   }
 
   .library-item {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .library-item.is-library-editing {
     grid-template-columns: 34px minmax(0, 1fr) auto auto;
   }
 

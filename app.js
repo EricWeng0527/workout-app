@@ -37,6 +37,7 @@ const elements = {
   historyEdit: document.querySelector("#history-edit-button"),
   libraryList: document.querySelector("#library-list"),
   libraryTabs: document.querySelector("#library-tabs"),
+  libraryEditButton: document.querySelector("#library-edit-button"),
   libraryForm: document.querySelector("#library-form"),
   libraryName: document.querySelector("#library-name"),
   exportOutput: document.querySelector("#export-output"),
@@ -56,6 +57,7 @@ let activeCategory = CATEGORIES[0];
 let activeLibraryCategory = CATEGORIES[0];
 let activeExerciseId = null;
 let isHistoryEditing = false;
+let isLibraryEditing = false;
 let editingLibraryName = "";
 let toastTimer = 0;
 let confirmResolver = null;
@@ -313,6 +315,11 @@ function handleClick(event) {
     "toggle-history-edit": () => {
       isHistoryEditing = !isHistoryEditing;
       renderHistory();
+    },
+    "toggle-library-edit": () => {
+      isLibraryEditing = !isLibraryEditing;
+      editingLibraryName = "";
+      renderLibrary();
     },
     "copy-text": copyTextExport,
     "download-json": downloadJson,
@@ -608,6 +615,10 @@ function switchView(view) {
     isHistoryEditing = false;
     renderHistory();
   }
+  if (view !== "library" && isLibraryEditing) {
+    isLibraryEditing = false;
+    renderLibrary();
+  }
   elements.saveToday.hidden = view !== "today";
 
   document.querySelectorAll(".view").forEach((section) => {
@@ -833,6 +844,9 @@ function renderLibrary() {
 
   elements.libraryList.innerHTML = "";
   const visibleExercises = state.exerciseLibrary.filter((exercise) => exercise.category === activeLibraryCategory);
+  elements.libraryEditButton.textContent = isLibraryEditing ? "完成" : "編輯";
+  elements.libraryEditButton.disabled = visibleExercises.length === 0;
+  elements.libraryEditButton.setAttribute("aria-pressed", String(isLibraryEditing));
   if (!visibleExercises.length) {
     const empty = document.createElement("div");
     empty.className = "library-empty";
@@ -883,36 +897,42 @@ function renderLibrary() {
       return;
     }
 
-    const dragHandle = document.createElement("button");
-    dragHandle.className = "library-drag-handle";
-    dragHandle.type = "button";
-    dragHandle.ariaLabel = "拖曳排序";
-    dragHandle.textContent = "≡";
-
     const label = document.createElement("span");
     label.className = "library-name";
     label.textContent = exercise.name;
 
-    const editButton = document.createElement("button");
-    editButton.className = "mini-button";
-    editButton.type = "button";
-    editButton.dataset.action = "library-edit";
-    editButton.dataset.name = exercise.name;
-    editButton.textContent = "編輯";
+    if (isLibraryEditing) {
+      const dragHandle = document.createElement("button");
+      dragHandle.className = "library-drag-handle";
+      dragHandle.type = "button";
+      dragHandle.ariaLabel = `拖曳排序：${exercise.name}`;
+      dragHandle.textContent = "≡";
 
-    const deleteButton = document.createElement("button");
-    deleteButton.className = "mini-button danger";
-    deleteButton.type = "button";
-    deleteButton.dataset.action = "library-delete";
-    deleteButton.dataset.name = exercise.name;
-    deleteButton.textContent = "刪除";
+      const editButton = document.createElement("button");
+      editButton.className = "mini-button";
+      editButton.type = "button";
+      editButton.dataset.action = "library-edit";
+      editButton.dataset.name = exercise.name;
+      editButton.textContent = "編輯";
 
-    item.append(dragHandle, label, editButton, deleteButton);
+      const deleteButton = document.createElement("button");
+      deleteButton.className = "mini-button danger";
+      deleteButton.type = "button";
+      deleteButton.dataset.action = "library-delete";
+      deleteButton.dataset.name = exercise.name;
+      deleteButton.textContent = "刪除";
+
+      item.classList.add("is-library-editing");
+      item.append(dragHandle, label, editButton, deleteButton);
+    } else {
+      item.append(label);
+    }
     elements.libraryList.append(item);
   });
 }
 
 function handleLibraryDragStart(event) {
+  if (!isLibraryEditing) return;
   const handle = event.target.closest(".library-drag-handle");
   if (!handle) return;
 
@@ -937,7 +957,31 @@ function handleLibraryDragMove(event) {
 
   const targetRect = target.getBoundingClientRect();
   const shouldPlaceBefore = event.clientY < targetRect.top + targetRect.height / 2;
+  const stationaryItems = [...elements.libraryList.querySelectorAll(".library-item")]
+    .filter((item) => item !== libraryDrag.item);
+  const previousTops = new Map(stationaryItems.map((item) => [item, item.getBoundingClientRect().top]));
   elements.libraryList.insertBefore(libraryDrag.item, shouldPlaceBefore ? target : target.nextElementSibling);
+  animateLibraryShift(stationaryItems, previousTops);
+}
+
+function animateLibraryShift(items, previousTops) {
+  if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
+
+  items.forEach((item) => {
+    const deltaY = previousTops.get(item) - item.getBoundingClientRect().top;
+    if (Math.abs(deltaY) < 1 || !item.animate) return;
+    item.getAnimations?.().forEach((animation) => animation.cancel());
+    item.animate(
+      [
+        { transform: `translateY(${deltaY}px)` },
+        { transform: "translateY(0)" },
+      ],
+      {
+        duration: 220,
+        easing: "cubic-bezier(0.22, 1, 0.36, 1)",
+      }
+    );
+  });
 }
 
 function handleLibraryDragEnd(event) {
